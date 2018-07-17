@@ -36,104 +36,95 @@ from PIL.ExifTags import TAGS
 #########################################################################
 # 操作 EXIF
 
-def read_image_datetime(filename):
-    image = Image.open(filename)
-    # 使用 pillow 的相容性較佳
-    # exif_dict = piexif.load(image.info["exif"])
-    # if 'Exif' in exif_dict and 36867 in exif_dict['Exif']:
-    #     return exif_dict['Exif'][36867]
-    # if '0th' in exif_dict and 306 in exif_dict['0th']:
-    #     return exif_dict['0th'][306]
-    # logging.error('read exif error: %s', filename)
-    # raise RuntimeError('datetime not found in EXIF: %s' % filename)
-    exif = image._getexif()
-    if exif:
-        if 36867 in exif.keys():
-            #return exif[36867][0:10].replace(':','')  # 2011:10:08 -> 20111008
-            #return exif[36867][0:7].replace(':','')  # 2011:10:08 -> 20111008
-            return exif[36867].replace(':', '').replace(' ', '_')
-        elif 306 in exif.keys():
-            #return exif[306][0:10].replace(':','')  # 2011:10:08 -> 20111008
-            #return exif[306][0:7].replace(':','')  # 2011:10:08 -> 20111008
-            return exif[306].replace(':', '').replace(' ', '_')
+class ImageTool(object):
 
-    # check file property
-    stat = os.stat(filename)
-    if hasattr(stat, 'st_mtime'):
-        return datetime.strftime(datetime.fromtimestamp(stat.st_mtime), "%Y%m%d_%H%M%S")
-    #st_ctime
-    #st_atime
-    print("exif err: %s \n%s" % (exif, filename))
-    # raise RuntimeError('datetime not found in EXIF: %s' % filename)
-    return None
+    @classmethod
+    def list_files(cls, dirs, exts):
+        """ 列出所有 image ('.jpg', '.jpeg') """
+        for dir in dirs:
+            logging.info('dir[%s]...', dir)
+            for dir_name, subdir_list, file_list in os.walk(dir):
+                for basename in file_list:
+                    for ext in exts:
+                        if basename.lower().endswith(ext):
+                            yield join(dir_name, basename)
+                            break
 
-def read_exif(filename):
-    logging.info('read_exif(%s)[+]', filename)
-    image = Image.open(filename)
-    exif_dict = piexif.load(image.info["exif"])
-    # DateTimeOriginal = exif_dict['Exif'][36867]
-    # UserComment = exif_dict['Exif'][37510]
-    # PixelXDimension = exif_dict['Exif'][40962]
-    # PixelYDimension = exif_dict['Exif'][40963]
-    # logging.info('%s %s %s %s', DateTimeOriginal, UserComment, PixelXDimension, PixelYDimension)
-    for ifd in ("0th", "Exif", "GPS", "1st"):
-        for tag in exif_dict[ifd]:
-            logging.info('%s.%s %s %s', ifd, tag, piexif.TAGS[ifd][tag]["name"], exif_dict[ifd][tag])
+    @classmethod
+    def read_datetime(cls, filename):
+        """ 讀取指定檔案的日期資訊 """
+        logging.debug('read_image_datetime(%s)[+]', filename)
+        image = Image.open(filename)
+        # 使用 pillow 的相容性較 (piexif) 佳
+        # exif_dict = piexif.load(image.info["exif"])
+        # if 'Exif' in exif_dict and 36867 in exif_dict['Exif']:
+        #     return exif_dict['Exif'][36867]
+        # if '0th' in exif_dict and 306 in exif_dict['0th']:
+        #     return exif_dict['0th'][306]
+        # logging.error('read exif error: %s', filename)
+        exif = image._getexif()
+        if exif:
+            if 36867 in exif.keys():
+                #return exif[36867][0:10].replace(':','')  # 2011:10:08 -> 20111008
+                #return exif[36867][0:7].replace(':','')  # 2011:10:08 -> 20111008
+                return exif[36867].replace(':', '').replace(' ', '_')
+            elif 306 in exif.keys():
+                #return exif[306][0:10].replace(':','')  # 2011:10:08 -> 20111008
+                #return exif[306][0:7].replace(':','')  # 2011:10:08 -> 20111008
+                return exif[306].replace(':', '').replace(' ', '_')
+        # check file property
+        stat = os.stat(filename)
+        if hasattr(stat, 'st_mtime'):
+            return datetime.strftime(datetime.fromtimestamp(stat.st_mtime), "%Y%m%d_%H%M%S")
 
+        logging.error('cannot read image datetime for file: %s', filename)
+        # raise RuntimeError('datetime not found in EXIF: %s' % filename)
+        return None
 
-def test_exif():
-    path = '/media/jerry/D_DAT/_Photo/002_已整理/20100710_大溪老街/DSC_3478.JPG'
-    image = Image.open(path)
-    # https://stackoverflow.com/questions/17042602/preserve-exif-data-of-image-with-pil-when-resizecreate-thumbnail/33885893#33885893
-    # https://github.com/hMatoba/Piexif
-    print('exif raw:', image.info['exif'])
-    exif_dict = piexif.load(image.info["exif"])
-    print('exif dict:')
-    for ifd in ("0th", "Exif", "GPS", "1st"):
-        for tag in exif_dict[ifd]:
-            # print(ifd, piexif.TAGS[ifd][tag]["name"], exif_dict[ifd][tag])
-            pass
-    # for k, v in exif_dict.items():
-    #     print(k, v)
-    #exif_bytes = piexif.dump(exif_dict)
-
-    # print( "%s, %s, %s"%(image.format, image.size, hasattr( image, '_getexif' )))
-    if hasattr( image, '_getexif' ):
-        exifinfo = image._getexif()
-        print(exifinfo)
-        if exifinfo != None:
-            # 36867  DateTimeOriginal
-            # 36868  DateTimeDigitized
-            # 306      DateTime (修改日期)
-            print(exifinfo[36867])
-            #for tag, value in exifinfo.items():
-            #    decoded = TAGS.get(tag, tag)
-            #    print( tag, "|", decoded, "|", value )
+    @classmethod
+    def read_exif(cls, filename):
+        logging.info('read_exif(%s)[+]', filename)
+        image = Image.open(filename)
+        exif_dict = piexif.load(image.info["exif"])
+        # DateTimeOriginal = exif_dict['Exif'][36867]
+        # UserComment = exif_dict['Exif'][37510]
+        # PixelXDimension = exif_dict['Exif'][40962]
+        # PixelYDimension = exif_dict['Exif'][40963]
+        # logging.info('%s %s %s %s', DateTimeOriginal, UserComment, PixelXDimension, PixelYDimension)
+        for ifd in ("0th", "Exif", "GPS", "1st"):
+            for tag in exif_dict[ifd]:
+                logging.info('%s.%s %s %s', ifd, tag, piexif.TAGS[ifd][tag]["name"], exif_dict[ifd][tag])
 
 
-class Picture(object):
+
+class Photo(object):
+    """ 代表照片 """
+
     def __init__(self, filename):
         self.filename = filename
-        self.datetime = read_image_datetime(filename)
+        self.datetime = ImageTool.read_datetime(filename)
 
-    def get_dst_file(self, target):
-        # root/year/date/
+    def get_dst_file(self, root_dir):
+        """ 取得 destination 檔案路徑
+            => root_dir/yyyy/yyyymmdd/yyyymmdd_hhmmssi.jpg
+        """
         ext = splitext(self.filename)[1].lower()
         ext = '.jpg' if ext == '.jpeg' else ext
-        return join(target, self.datetime[0:4], self.datetime[0:8], self.datetime + ext)
+        return join(root_dir, self.datetime[0:4], self.datetime[0:8], self.datetime + ext)
 
-    def move_to_dst(self, target):
+    def move_to_dst(self, root_dir):
         logging.info('move: %s', self.filename)
         # check datetime
         if self.datetime is None:
-            logging.info('cannot get datetime: %s', self.filename)
+            logging.warning('cannot move file: datetime(%s) is None', self.filename)
             return
-        filename = self.get_dst_file(target)
+        filename = self.get_dst_file(root_dir)
         # check parent folder
         folder = abspath(join(filename, pardir))
         if not exists(folder):
             makedirs(folder)
         # check dest file not exists
+        # 名稱: YYYYMMDDHHMMSS.jpg 重複時秒數加 1 ??
         path, ext = splitext(filename)
         for i in range(100):
             newfile = ''.join([path, str(i), ext])
@@ -158,24 +149,6 @@ class Folder(object):
 
     def __repr__(self):
         return '%s(%d)' % (self.dirname, self.count)
-
-
-def list_picture(dirs):
-    """ 列出所有 image """
-    for dir in dirs:
-        logging.info('dir[%s]...', dir)
-        for dir_name, subdir_list, file_list in os.walk(dir):
-            for basename in file_list:
-                if basename.lower().endswith(".jpg") or basename.lower().endswith(".jpeg"):
-                    yield Picture(join(dir_name, basename))
-
-
-def list_date_folder(dir):
-    for dir_name, subdir_list, file_list in os.walk(dir):
-        # logging.info('dir[%s]...', dir_name)
-        for name in subdir_list:
-            if len(name) == 8:
-                yield Folder(join(dir_name, name))
 
 
 #########################################################################
@@ -208,75 +181,60 @@ def move_picture(dirs, target):
         picture.move_to_dst(target)
 
 
-#########################################################################
-# 重新命名檔案
-
-def rename_image(dirs):
-    """
-    1. 名稱: YYYYMMDDHHMMSS.jpg 重複時秒數加 1
-    """
-    names = {}
-    for image in list_picture(dirs):
-        datetime = read_image_datetime(image)
-        if datetime is None:
-            continue
-        datetime = datetime.replace(':', '').replace(' ', '_')
-        if datetime in names:
-            logging.warning('duplicated: %s', datetime)
-            logging.warning('  f1: %s', names[datetime])
-            logging.warning('  f2: %s', image)
-        else:
-            names[datetime] = image
-        _rename_with_check(image, datetime)
 
 
-def _rename_with_check(filename, new_name):
-    # logging.info('rename: %s -> %s', filename, new_name)
-    name, ext = splitext(basename(filename))
-    #if name == new_name:
-    #    return
-    folder = abspath(join(filename, pardir))
-    ext = ext.lower()
-    ext = '.jpg' if ext == '.jpeg' else ext
-    for i in range(100):
-        newfile = join(folder, ''.join([new_name, str(i), ext]))
-        if not exists(newfile):
-            logging.info('%s -> %s', filename, newfile)
-            shutil.move(filename, newfile)
-            break
+class DateNote(object):
+    """ 代表已標住的目錄 (date: note), e.g. 20111001_陽明員工旅遊紙箱王 """
 
-#########################################################################
-# 紀錄已標住的目錄 (date: note)
+    @classmethod
+    def dump_date_note(cls, root_dir, out_file='note.txt'):
+        res = {}
+        for dir_name, subdir_list, file_list in os.walk(root_dir):
+            for subdir in subdir_list:
+                if len(subdir) > 9 and subdir[8] == '_':
+                    print(subdir)
+                    date = subdir[:8]
+                    note = subdir[9:]
+                    res[date] = note
+        with open(out_file, 'w', encoding='utf8') as out:
+            keys = sorted(res.keys())
+            for key in keys:
+                out.write('{}:{}\n'.format(key, res[key]))
 
-def restore_date_note(dir):
-    note = load_date_note()
-    used = set()
-    for f in list_date_folder(dir):
-        if f.date in note:
-            used.add(f.date)
-            new_name = note[f.date]
-            f.rename(new_name)
-    # list un-used
-    for date in (note.keys() - used):
-        print(date, note[date])
+    @classmethod
+    def load_date_note(cls, filename='note.txt'):
+        res = {}
+        with open(filename, 'r', encoding='utf8') as src:
+            for line in src:
+                key, val = line.split(':')
+                res[key] = val.rstrip('\n')
+        logging.info('date_note: %s', res)
+        return res
 
-def load_date_note():
-    with open('./note.txt', 'r') as src:
-        res = json.load(src)
-    print(res)
-    return res
+    @classmethod
+    def list_date_folder(cls, dir):
+        for dir_name, subdir_list, file_list in os.walk(dir):
+            for name in subdir_list:
+                if len(name) == 8:
+                    yield Folder(join(dir_name, name))
+
+    @classmethod
+    def apply_date_note(cls, dir):
+        note = cls.load_date_note()
+        used = set()
+        for f in list_date_folder(dir):
+            if f.date in note:
+                used.add(f.date)
+                new_name = note[f.date]
+                f.rename(new_name)
+        # list un-used
+        for date in (note.keys() - used):
+            print(date, note[date])
 
 
-def dump_date_note(root_dir):
-    beg = len(root_dir)+1
-    res = {}
-    for dir_name, subdir_list, file_list in os.walk(root_dir):
-        if dir_name == root_dir:
-            continue
-        date, note = dir_name[beg:].split('_')
-        res[date] = note
-    with open('./note.txt', 'w') as out:
-        json.dump(res, out)
+
+
+
 
 
 #########################################################################
@@ -285,14 +243,16 @@ def dump_date_note(root_dir):
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)-15s %(levelname)s %(message)s', level=logging.INFO)
     logging.info('start')
+
+    # 管理 date note
+    # DateNote.dump_date_note('/home/jerry/_media/_photo/001_照片/')
+    # dn = DateNote.load_date_note()
+
+    # restore_date_note('/media/jerry/D_DAT/_Photo/001_照片')
+
     # search_duplicated(['/media/jerry/D_DAT/_Photo/002_已整理/20090308_宸瑀生活照', '/media/jerry/D_DAT/_Photo/宸瑀'])
     # rename_image(['/media/jerry/D_DAT/_Photo/000_待分日/wanyun'])
     # move_picture(['/media/jerry/D_DAT/_Photo/000_整理/arc'], '/media/jerry/D_DAT/_Photo/001_照片')
     # print(read_image_datetime('/media/jerry/D_DAT/_Photo/000_整理/無法判定/00000752.jpg'))
 
-    # restore_date_note('/media/jerry/D_DAT/_Photo/001_照片')
 
-    # read_exif('/media/jerry/D_DAT/_Photo/002_已整理/20130106_柯達阿公慶生/DSC_4603.JPG')
-    # read_exif('/media/jerry/D_DAT/_Photo/002_已整理/20130106_柯達阿公慶生/IMAG0343.jpg')
-    # dump_date_note('/media/jerry/D_DAT/_Photo/002_已整理')
-    # load_date_note()
